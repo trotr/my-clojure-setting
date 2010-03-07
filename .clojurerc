@@ -1,0 +1,44 @@
+(use '[clojure.contrib.repl-utils])
+(set! *print-length* 5)
+
+(defn prints [xs] (doseq [x xs] (println x)))
+
+(defn current-classpath []
+  (let [xs (list (.. java.lang.ClassLoader getSystemClassLoader getURLs)
+		 (.. clojure.lang.RT getRootClassLoader getURLs))]
+    (apply concat  (map (fn [urls] (map #(. % getFile) urls)) xs))))
+
+
+(use '[clojure.contrib.repl-utils])
+
+(defn class-info [k]
+  (letfn [(get-method-info [m]
+			   {:name (. m getName)
+			    :args (map class-simple (. m getParameterTypes))
+			    :return-type (class-simple (. m getReturnType))})
+	  (class-simple [k] (let [k* (. k getSimpleName)]
+			      (if (= "Object" k*) "o" k*)))]
+    (let [k (if (class? k) k (class k))]
+      {:class k
+       :methods (sort-by #(:name %) (map get-method-info (. k getMethods)))})))
+
+(defn class-info [k]
+  (letfn [(get-method-info [m]
+			   {:name (. m getName)
+			    :args (map class-simple (. m getParameterTypes))
+			    :return-type (class-simple (. m getReturnType))})
+	  (class-simple [k] (let [k* (. k getSimpleName)]
+			      (if (= "Object" k*) "o" k*)))]
+    (let [k (if (class? k) k (class k))]
+      {:class k
+       :methods (sort-by #(:name %) (map get-method-info (. k getMethods)))})))
+
+(defn describe-class [k]
+  (let [table (class-info k)]
+    (println "==" (:class table) "==")
+    (doseq [x (:methods table)] (println x))))
+
+(defn describe-class-for-anything [k]
+  (let [table (class-info k)]
+    (doseq [x (:methods table)]
+      (println (:name x)  (:args x) "=>" (:return-type x)))))
