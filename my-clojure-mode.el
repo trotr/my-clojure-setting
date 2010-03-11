@@ -278,15 +278,9 @@
     ;;persistent-actionとか加えていないな。
     `((name . ,file)
       (candidates . ,libraries)
-      (action . (("use .. (use '[library])" . clojure--insert-use)
-		 ("use only .. (use '[library :only (...)" . clojure--insert-use-with-only)
+      (action . (("use only .. (use '[library :only (...)" . clojure--insert-use-with-only)
+		 ("use .. (use '[library])" . clojure--insert-use)
 		 ("describe library" . clojure--describe-library)
-		 ("find file other frame" .
-		  (lambda (c)
-		    (clojure-let1 jars
-			(read
-			 (clojure-eval '(map (fn [x] (.getName x)) (classpath-jarfiles)) ))
-		      (clojure-find-file-other-frame jars c))))
 		 ("require as .. (require '[library :as <>])" .
 		  (lambda (c)
 		    (clojure-let1 as (read-string (format "require %s as:" c))
@@ -341,7 +335,7 @@
 				       (insert (car (split-string c " +")))))
 			 ("find-doc" . clojure-find-doc-from-candidate)))
 	      (persistent-action .  clojure-find-doc-from-candidate))))
-      (anything (list source) (format "^%s.*" word))))
+      (anything (list source) (format "^%s" word))))
   )
 
 
@@ -504,17 +498,22 @@
   (interactive)
   (clojure-ffap x t))
 
+(defun* clojure-ffap (&optional (x (current-word)) (other-frame-p nil))
+  (destructuring-bind (jars file line)
+      (mapcar 'cadr (clojure-get-info-for-ffap x))
+    (if other-frame-p
+	(clojure-find-file-other-frame jars file line)
+	(clojure-find-file jars file line))))
+
 (defun clojure-find-file (jars file-path &optional lineno)
-  (clojure-let1 file-path (replace-regexp-in-string "-" "_" file-path) 
-    (catch 'return
-      (dolist (jar-path jars)
-	(find-file jar-path)
+  (catch 'return
+    (dolist (jar-path jars)      (find-file jar-path)
+      (goto-char (point-min))
+      (when (re-search-forward file-path nil t 1)
+	(archive-extract)
 	(goto-char (point-min))
-	(when (re-search-forward file-path nil t 1)
-	  (archive-extract)
-	  (goto-char (point-min))
-	  (when lineno (forward-line (1- lineno))) 
-	  (throw 'return nil))))))
+	(when lineno (forward-line (1- lineno))) 
+	(throw 'return nil)))))
 
 (defun clojure-find-file-other-frame (jars file-path &optional lineno)
   (clojure-select-frame)
