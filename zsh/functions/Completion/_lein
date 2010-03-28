@@ -1,0 +1,4 @@
+#compdef lein
+
+_arguments '1:first:(pom help upgrade install jar test deps uberjar clean compile version)' \
+           '*:tail:_files'
