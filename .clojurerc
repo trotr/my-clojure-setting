@@ -1,32 +1,19 @@
+(use 'clojure.contrib.classpath)
 (use '[clojure.contrib.repl-utils])
-(set! *print-length* 5)
 
-(defn prints [xs] (doseq [x xs] (println x)))
+(defmacro with-no-length [& body]
+  `(binding [*print-length* nil]
+     ~@body))
 
-(defn current-classpath []
-  (let [xs (list (.. java.lang.ClassLoader getSystemClassLoader getURLs)
-		 (.. clojure.lang.RT getRootClassLoader getURLs))]
-    (apply concat  (map (fn [urls] (map #(. % getFile) urls)) xs))))
-
-
-(use '[clojure.contrib.repl-utils])
+(defn prints [coll]
+  (with-no-length
+    (doseq [x coll] (println x))))
 
 (defn class-info [k]
   (letfn [(get-method-info [m]
-			   {:name (. m getName)
-			    :args (map class-simple (. m getParameterTypes))
-			    :return-type (class-simple (. m getReturnType))})
-	  (class-simple [k] (let [k* (. k getSimpleName)]
-			      (if (= "Object" k*) "o" k*)))]
-    (let [k (if (class? k) k (class k))]
-      {:class k
-       :methods (sort-by #(:name %) (map get-method-info (. k getMethods)))})))
-
-(defn class-info [k]
-  (letfn [(get-method-info [m]
-			   {:name (. m getName)
-			    :args (map class-simple (. m getParameterTypes))
-			    :return-type (class-simple (. m getReturnType))})
+	   {:name (. m getName)
+	    :args (map class-simple (. m getParameterTypes))
+	    :return-type (class-simple (. m getReturnType))})
 	  (class-simple [k] (let [k* (. k getSimpleName)]
 			      (if (= "Object" k*) "o" k*)))]
     (let [k (if (class? k) k (class k))]
@@ -40,5 +27,13 @@
 
 (defn describe-class-for-anything [k]
   (let [table (class-info k)]
-    (doseq [x (:methods table)]
-      (println (:name x)  (:args x) "=>" (:return-type x)))))
+   (doseq [x (:methods table)]
+     (println (:name x)  (:args x) "=>" (:return-type x)))))
+
+(defn describe-ns [ns]
+  (prints (keys (ns-interns ns))))
+
+(defn current-classpath []
+  (seq (. (ClassLoader/getSystemClassLoader) getURLs)))
+
+(set! *print-length* 10)

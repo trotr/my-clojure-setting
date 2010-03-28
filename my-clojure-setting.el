@@ -335,7 +335,7 @@
 				       (insert (car (split-string c " +")))))
 			 ("find-doc" . clojure-find-doc-from-candidate)))
 	      (persistent-action .  clojure-find-doc-from-candidate))))
-      (anything (list source) (format "^%s" word))))
+      (anything (list source) (format "^%s.*" word))))
   )
 
 
