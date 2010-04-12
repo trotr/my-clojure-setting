@@ -75,6 +75,22 @@
 	      clojure-buffer buf)))
     (display-buffer buf)))
 
+(lexical-let ((clojure-lein-repl-path ""))
+  (defun run-lein-repl (path) (interactive "Glein-path:")
+    (let1 buf clojure-repl-name
+      (unless (string-equal clojure-lein-repl-path path)
+	(let1 x-file  (make-temp-file "clojure-lein-repl")
+	  (with-current-buffer (find-file-noselect x-file)
+	    (insert (format "#!/bin/sh\n\ncd %s && lein repl" path))
+	    (save-buffer)
+	    (kill-buffer))
+	  (call-process-shell-command (format "chmod u+x %s" x-file))
+	  (make-comint "clojure" x-file nil)
+	  (clojure-eval `(load-file ,clojure-init-file))
+	  (setq clojure-program-name x-file clojure-buffer buf
+		clojure-lein-repl-path path)))
+      (display-buffer buf))))
+
 (defun clojure-kill-repl () (interactive)
   (clojure-let1 repl-buf (get-buffer clojure-repl-name)
     (kill-process (get-process "clojure"))
@@ -332,7 +348,7 @@
 	      (candidates . clojure-available-symbols)
 	      (action . (("insert" . (lambda (c)
 				       (delete-backward-char ,(length word))
-				       (insert (car (split-string c " +")))))
+				       (insert (car (split-string c "[\t ]+")))))
 			 ("find-doc" . clojure-find-doc-from-candidate)))
 	      (persistent-action .  clojure-find-doc-from-candidate))))
       (anything (list source) (format "^%s.*" word))))
