@@ -37,8 +37,8 @@
 				      ,body))))))
 
 ;;;
-
-(defvar clojure-program-name "clojure")
+(defvar clojure-program-name-default "clojure")
+(defvar clojure-program-name clojure-program-name-default)
 (defvar clojure-repl-name "*clojure*")
 (defun clojure-get-files-from-buffer (buf pattern)
   (with-current-buffer buf
@@ -50,7 +50,17 @@
 	  do (forward-line 1))))
 
 (defun clojure-class-path-list ()
-  (clojure-get-files-from-buffer (find-file-noselect clojure-class-path-file) "\\.jar$"))
+  (if (get-process "clojure")
+      (read
+       (clojure-eval 
+	'(do (use 'clojure.contrib.jar)
+	     (let [dir (System/getProperty "user.dir")] 
+	       (map (fn [jar] 
+			(let [name (.getName jar)]
+			  (if (.startsWith name "/") name (str dir "/" name))))
+		    (classpath-jarfiles))))))
+      (clojure-get-files-from-buffer (find-file-noselect clojure-class-path-file) "\\.jar$")))
+  
 
 (defvar clojure-libraries-cache nil)
 (defun clojure-libraries (file &optional forcep)
@@ -66,7 +76,7 @@
 (defun run-clojure (cmd) 
   (interactive (list (if current-prefix-arg
 			 (read-string "Run Clojure: " clojure-program-name)
-			 clojure-program-name)))
+			 clojure-program-name-default)))
   (clojure-let1 buf clojure-repl-name
     (unless  (comint-check-proc buf)
       (clojure-let1 cplist (mapconcat 'identity (cons "." (cons "classes" (clojure-class-path-list))) ":")
@@ -348,7 +358,7 @@
 	      (candidates . clojure-available-symbols)
 	      (action . (("insert" . (lambda (c)
 				       (delete-backward-char ,(length word))
-				       (insert (car (split-string c "[\t ]+")))))
+				       (insert (car (split-string c "[\t \[]+")))))
 			 ("find-doc" . clojure-find-doc-from-candidate)))
 	      (persistent-action .  clojure-find-doc-from-candidate))))
       (anything (list source) (format "^%s.*" word))))
