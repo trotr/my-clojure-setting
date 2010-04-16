@@ -141,24 +141,36 @@
 (defsubst clojure-cleanup-storage ()
   (setq clojure-output-storage nil))
 
-(defmacro %clojure-connect-repl (send-action)
-  `(let ((clojure-reading-p t)
-	 (old-comint-filter comint-preoutput-filter-functions)
-	 (comint-preoutput-filter-functions clojure-output-filter-functions))
-     (run-at-time clojure-reading-timelimit nil 'clojure-stop-reading) ;;for safe(time limit)
+(defmacro %clojure-connect-repl (send-action &optional timeout) ;timeout is sec
+  (let ((life-time (gensym)) (old-comint-filter (gensym)))
+    `(let ((clojure-reading-p t)
+	   (,old-comint-filter comint-preoutput-filter-functions)
+	   (comint-preoutput-filter-functions clojure-output-filter-functions)
+	   (,life-time ,timeout)) ;;
+       (run-at-time clojure-reading-timelimit nil 'clojure-stop-reading) ;;for safe(time limit)
      (unwind-protect
 	 (progn (clojure-cleanup-storage)
 		,send-action
-		(while clojure-reading-p (sleep-for 0 100))
+		(while clojure-reading-p 
+		  (sleep-for 0 100)
+		  (when ,life-time
+		    (decf ,life-time 0.1)
+		    (when (<= ,life-time 0)
+		      (signal  'quit "calc time is too long."))))
 		(apply 'concat (reverse clojure-output-storage)))
-       (setq comint-preoutput-filter-functions old-comint-filter
+       (setq comint-preoutput-filter-functions ,old-comint-filter
 	     clojure-reading-p nil)
-       )))
+       ))))
 
-(defmacro clojure-connect-with-repl (send-func)
-  `(progn (clojure-repl-wakeup)			;prepare
-	  (%clojure-connect-repl ,send-func)))
-
+(defmacro clojure-connect-with-repl (send-func &optional timeout)
+  `(cond (clojure-reading-p
+	  (run-with-idle-timer 
+	   0.2 nil
+	   (lambda () (clojure-connect-with-repl ,send-func))))
+	 (t
+	  (progn (clojure-repl-wakeup)			;prepare
+		 (%clojure-connect-repl ,send-func ,timeout)))))
+	 
 ;;eval via (C-x C-e .etc)
 (defun clojure-send-string (str &optional newline-p)
   (clojure-let1 p (get-process "clojure")
@@ -197,13 +209,14 @@
     (clojure-send-with-action 
      'beginning-of-buffer 'end-of-buffer t)))
 
-(defun clojure-eval (sexp)
+(defun clojure-eval (sexp &optional timeout)
   (let ((print-length nil)
 	(print-level nil))
     (clojure-let1 content (prin1-to-string sexp)
       (clojure-connect-with-repl
        (clojure-send-string 
-	(replace-regexp-in-string "\\\\." "." content)	t)))))
+	(replace-regexp-in-string "\\\\." "." content)	t)
+       timeout))))
 
 ;;;anything interface
 (when (fboundp 'anything)
@@ -315,6 +328,23 @@
 		 ("insert Marked candidates" .
 		  (lambda (c) (mapc 'clojure--insert-use 
 				    (anything-marked-candidates))))
+		 ("all candidates output buffer" . 
+		  (lambda (_) 
+		    (let ((buf "*clojure libraries*"))
+		      (with-current-buffer (get-buffer-create buf)
+			(erase-buffer)
+			(dolist (xs anything-candidate-cache)
+			  (destructuring-bind (file . libraries) xs
+			    (insert (propertize file 'face 'anything-header) "\n")
+			    (dolist (lib libraries)
+			      (lexical-let ((jar file) (lib lib))
+				(insert-text-button lib 'action 
+						    (lambda (b) 
+						      (clojure-find-file-other-frame
+						       (list jar)
+						       (concat lib ".clj")))))
+			      (insert "\n")))))
+		      (display-buffer buf))))
 		 ))))
 
   (defun clojure-insert-use/anything () (interactive)
@@ -469,7 +499,8 @@
    `(try 
      (when-let [v (meta (resolve (symbol ,(current-word))))]
 	       (apply str (:ns v) "." (:name v) "    " (:arglists v)))
-     (catch Throwable _ nil))))
+     (catch Throwable _ nil))
+   0.3))
 
 ;;describe-class
 (defun clojure-sub-output-buffer (&optional appendp)
