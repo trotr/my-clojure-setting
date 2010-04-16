@@ -312,7 +312,13 @@
   
   (defsubst clojure--insert-use-with-only (c)
     (run-with-timer 0.1 nil 'clojure-library-interns-select/anything c)) 
-
+  
+(defsubst clojure--library-name-to-path (lib)
+    (loop for pat in '("\\." "-")
+	  for rep in '("/" "_")
+	  do (setq lib (replace-regexp-in-string pat rep lib)))
+    (concat lib ".clj"))
+    
   (defun clojure-library-make-source (file libraries)
     ;;persistent-actionとか加えていないな。
     `((name . ,file)
@@ -330,7 +336,7 @@
 				    (anything-marked-candidates))))
 		 ("all candidates output buffer" . 
 		  (lambda (_) 
-		    (let ((buf "*clojure libraries*"))
+		    (clojure-let1 buf "*clojure libraries*"
 		      (with-current-buffer (get-buffer-create buf)
 			(erase-buffer)
 			(dolist (xs anything-candidate-cache)
@@ -342,10 +348,10 @@
 						    (lambda (b) 
 						      (clojure-find-file-other-frame
 						       (list jar)
-						       (concat lib ".clj")))))
-			      (insert "\n")))))
+						       (clojure--library-name-to-path lib))))
+				(insert "\n"))))))
 		      (display-buffer buf))))
-		 ))))
+		 )))))
 
   (defun clojure-insert-use/anything () (interactive)
     (clojure-let1 sources
