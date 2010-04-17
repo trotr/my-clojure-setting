@@ -60,7 +60,7 @@
 			  (if (.startsWith name "/") name (str dir "/" name))))
 		    (classpath-jarfiles))))))
       (clojure-get-files-from-buffer (find-file-noselect clojure-class-path-file) "\\.jar$")))
-  
+
 
 (defvar clojure-libraries-cache nil)
 (defun clojure-libraries (file &optional forcep)
@@ -148,19 +148,19 @@
 	   (comint-preoutput-filter-functions clojure-output-filter-functions)
 	   (,life-time ,timeout)) ;;
        (run-at-time clojure-reading-timelimit nil 'clojure-stop-reading) ;;for safe(time limit)
-     (unwind-protect
-	 (progn (clojure-cleanup-storage)
-		,send-action
-		(while clojure-reading-p 
-		  (sleep-for 0 100)
-		  (when ,life-time
-		    (decf ,life-time 0.1)
-		    (when (<= ,life-time 0)
-		      (signal  'quit "calc time is too long."))))
-		(apply 'concat (reverse clojure-output-storage)))
-       (setq comint-preoutput-filter-functions ,old-comint-filter
-	     clojure-reading-p nil)
-       ))))
+       (unwind-protect
+	   (progn (clojure-cleanup-storage)
+		  ,send-action
+		  (while clojure-reading-p 
+		    (sleep-for 0 100)
+		    (when ,life-time
+		      (decf ,life-time 0.1)
+		      (when (<= ,life-time 0)
+			(signal  'quit "calc time is too long."))))
+		  (apply 'concat (reverse clojure-output-storage)))
+	 (setq comint-preoutput-filter-functions ,old-comint-filter
+	       clojure-reading-p nil)
+	 ))))
 
 (defmacro clojure-connect-with-repl (send-func &optional timeout)
   `(cond (clojure-reading-p
@@ -170,12 +170,12 @@
 	 (t
 	  (progn (clojure-repl-wakeup)			;prepare
 		 (%clojure-connect-repl ,send-func ,timeout)))))
-	 
+
 ;;eval via (C-x C-e .etc)
 (defun clojure-send-string (str &optional newline-p)
   (clojure-let1 p (get-process "clojure")
     (cond (newline-p (comint-simple-send p str))
-;;	   (comint-send-string p (concat str "\n")))
+	  ;;	   (comint-send-string p (concat str "\n")))
 	  (t (comint-send-string p str)))))
 
 (defun clojure-send-with-action (beg-ac end-ac &optional newline-p)
@@ -264,7 +264,7 @@
 				(clojure-let1 str 
 				    (buffer-substring-no-properties
 				     (point) (progn (skip-chars-forward "^]") (point)))
-				(clojure-source-of-current-symbol str))))))
+				  (clojure-source-of-current-symbol str))))))
       (insert right "\n")))
 
   ;; (defun clojure-source-of-current-symbol () (interactive)
@@ -313,12 +313,12 @@
   (defsubst clojure--insert-use-with-only (c)
     (run-with-timer 0.1 nil 'clojure-library-interns-select/anything c)) 
   
-(defsubst clojure--library-name-to-path (lib)
+  (defsubst clojure--library-name-to-path (lib)
     (loop for pat in '("\\." "-")
 	  for rep in '("/" "_")
 	  do (setq lib (replace-regexp-in-string pat rep lib)))
     (concat lib ".clj"))
-    
+  
   (defun clojure-library-make-source (file libraries)
     ;;persistent-actionとか加えていないな。
     `((name . ,file)
@@ -351,29 +351,29 @@
 						       (clojure--library-name-to-path lib))))
 				(insert "\n"))))))
 		      (display-buffer buf))))
-		 )))))
+		 ))))
 
   (defun clojure-insert-use/anything () (interactive)
     (clojure-let1 sources
 	(loop for (file libraries) in (mapcar 'clojure-libraries (clojure-class-path-list))
 	      collect (clojure-library-make-source file libraries))
       (anything sources)))
-  
+
   (defun clojure-available-symbols () ;ns is nil or string
     (clojure-let1 r
 	(clojure-eval
 	 `(do 
 	      (doseq [[fun path] (sort (ns-map *ns*))]
-		    (printf "%-25s\t[%s]\n" fun (print-str path)))
-	     (doseq [[prefix ns] (ns-aliases *ns*) 
-		     [fun path] (sort (ns-interns ns))]
-		    (printf "%s/%-25s\t[%s]\n" (str prefix) fun (print-str path)))))
+		     (printf "%-25s\t[%s]\n" fun (print-str path)))
+	      (doseq [[prefix ns] (ns-aliases *ns*) 
+		      [fun path] (sort (ns-interns ns))]
+		     (printf "%s/%-25s\t[%s]\n" (str prefix) fun (print-str path)))))
       (split-string r "\n")))
 
   (defsubst clojure-find-doc-from-candidate (c)
     (clojure-let1 s (car (split-string c " +"))
       (clojure-find-doc (replace-regexp-in-string "^.+/" "" s)))) 
-  
+
   (defun clojure-find-doc/anything () (interactive)
     (clojure-let1 source
 	`((name . "function")
@@ -382,8 +382,8 @@
 	  (action . (("find-doc" . clojure-find-doc-from-candidate)
 		     ("find-file-other-frame" . 
 		      (lambda (c)
-		     	(clojure-let1 s (car (split-string c " +"))
-		     	  (clojure-ffap-other-frame s))))
+			(clojure-let1 s (car (split-string c " +"))
+			  (clojure-ffap-other-frame s))))
 		     ("print (debug)" . print*))))
       (anything (list source) (current-word))))
 
@@ -548,14 +548,14 @@
 
 (defun clojure-get-info-for-ffap (x)
   "return ((dirs (dir ...)) (file file) (line line))"
- (clojure-let1 str (clojure-x-to-string x)
-   (read 
-    (clojure-eval
-     `(when-let [table (meta (resolve (symbol ,str)))]
-		(list (list (quote dirs)
-			    (map (fn [url] (.getFile url)) (current-classpath)))
-		      (list (quote file) (:file table))
-		      (list (quote line) (:line table))))))))
+  (clojure-let1 str (clojure-x-to-string x)
+    (read 
+     (clojure-eval
+      `(when-let [table (meta (resolve (symbol ,str)))]
+		 (list (list (quote dirs)
+			     (map (fn [url] (.getFile url)) (current-classpath)))
+		       (list (quote file) (:file table))
+		       (list (quote line) (:line table))))))))
 
 (defun* clojure-ffap-other-frame (&optional (x (current-word)))
   (interactive)
@@ -571,12 +571,12 @@
 (defun clojure-find-file (jars file-path &optional lineno)
   (catch 'return
     (dolist (jar-path jars)      (find-file jar-path)
-      (goto-char (point-min))
-      (when (re-search-forward file-path nil t 1)
-	(archive-extract)
-	(goto-char (point-min))
-	(when lineno (forward-line (1- lineno))) 
-	(throw 'return nil)))))
+	    (goto-char (point-min))
+	    (when (re-search-forward file-path nil t 1)
+	      (archive-extract)
+	      (goto-char (point-min))
+	      (when lineno (forward-line (1- lineno))) 
+	      (throw 'return nil)))))
 
 (defun clojure-find-file-other-frame (jars file-path &optional lineno)
   (clojure-select-frame)
