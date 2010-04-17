@@ -323,16 +323,21 @@
     ;;persistent-actionとか加えていないな。
     `((name . ,file)
       (candidates . ,libraries)
-      (action . (("use only .. (use '[library :only (...)" . clojure--insert-use-with-only)
-		 ("use .. (use '[library])" . clojure--insert-use)
+      (action . (("use .. (use '[library])" . clojure--insert-use)
+		 ("use only .. (use '[library :only (...)" . clojure--insert-use-with-only)
 		 ("describe library" . clojure--describe-library)
 		 ("require as .. (require '[library :as <>])" .
 		  (lambda (c)
 		    (clojure-let1 as (read-string (format "require %s as:" c))
 		      (clojure--anything-insert
 		       (format "(require '[%s :as %s])" c as)))))
+		 ("open library file" . 
+		  (lambda (c)
+		    (clojure-find-file-other-frame
+		     (list ,file)
+		     (clojure--library-name-to-path c))))
 		 ("insert Marked candidates" .
-		  (lambda (c) (mapc 'clojure--insert-use 
+		  (lambda (_) (mapc 'clojure--insert-use 
 				    (anything-marked-candidates))))
 		 ("all candidates output buffer" . 
 		  (lambda (_) 
